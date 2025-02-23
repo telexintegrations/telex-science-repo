@@ -18,8 +18,7 @@ class MonitorPayload(BaseModel):
     return_url: str
     settings: List[Setting]
 
-
-app = FastAPI() 
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,7 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/integraton/json")
+@app.get("/integration/json")
 def get_integration_json(request: Request):
     base_url = str(request.base_url).rstrip("/")
     return {
@@ -49,24 +48,26 @@ def get_integration_json(request: Request):
                     "required": True, 
                     "default": "* * * * *"
                 },
-                {"label": "Keywords", 
-                "type": "text", 
-                "required": False, 
-                "default": "biochemistry, genetics, biotechnology, medicine"
+                {
+                    "label": "Keywords", 
+                    "type": "text", 
+                    "required": False, 
+                    "default": "biochemistry, genetics, biotechnology, medicine"
                 }
             ],
             "tick_url": f"{base_url}/tick" 
         }
     }
 
-    async def fetch_and_send_articles(payload: MonitorPayload):
-    #"Fetch latest PubMed articles and send notifications to Telex""
-        keywords = setting.default.split(", "),
-        for setting in payload.settings:
-            if setting.label.lower() == "keywords" and setting.default:
-                keywords = setting.default
+async def fetch_and_send_articles(payload: MonitorPayload):
+    # Fetch latest PubMed articles and send notifications to Telex
+    keywords = ""
+    for setting in payload.settings:
+        if setting.label.lower() == "keywords" and setting.default:
+            keywords = setting.default
 
     pubmed_search_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={keywords}&retmax=5&sort=pub+date&retmode=json"
+
     async with httpx.AsyncClient() as client:
         try:
             search_response = await client.get(pubmed_search_url)
@@ -78,9 +79,11 @@ def get_integration_json(request: Request):
 
             fetch_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id={','.join(id_list)}&retmode=json"
             fetch_response = await client.get(fetch_url)
-            
+            fetch_json = fetch_response.json()
+
+            message = ""
             for article_id in id_list:
-                article = articles.get(article_id, {})
+                article = fetch_json["result"].get(article_id, {})
                 title = article.get("title", "No title available")
                 authors = ", ".join([author["name"] for author in article.get("authors", [])]) if "authors" in article else "Unknown authors"
                 message += f"- {title} by {authors}\n"
@@ -95,8 +98,14 @@ def get_integration_json(request: Request):
                 payload.return_url, json=notification_payload
             )
         except Exception as e:
-            print(
-                f"Error: {e}"
-            )
+            print(f"Error: {e}")
 
+@app.post("/tick", status_code=202)
+def monitor(payload: MonitorPayload, background_tasks: BackgroundTasks):
+    # Triggers the PubMed fetch task in the background.
+    background_tasks.add_task(fetch_and_send_articles, payload)
+    return {"status": "success"}
 
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
