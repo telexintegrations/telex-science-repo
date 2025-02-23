@@ -70,51 +70,53 @@ def get_integration_json(request: Request):
         }
     }
 
-async def fetch_and_send_articles(payload: MonitorPayload):
-    
-    keywords = "biochemistry"
-    for setting in payload.settings:
-        if setting.label.lower() == "keywords" and setting.default:
-            keywords = setting.default.replace(", ", "+")
+async def fetch_and_send_articles(payload: MonitorPayload, interval: int):
+    """Fetch latest PubMed articles and send notifications to Telex repeatedly."""
+    while True:
+        keywords = "biochemistry"  # Default keyword
+        for setting in payload.settings:
+            if setting.label.lower() == "keywords" and setting.default:
+                keywords = setting.default.replace(", ", "+").replace(",", "+")
 
-    pubmed_search_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={keywords}&retmax=10&sort=pub+date&retmode=json"
+        pubmed_search_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={keywords}&retmax=5&sort=pub+date&retmode=json"
+        async with httpx.AsyncClient() as client:
+            try:
+                search_response = await client.get(pubmed_search_url)
+                search_json = search_response.json()
+                id_list = search_json["esearchresult"].get("idlist", [])
 
-    async with httpx.AsyncClient() as client:
-        try:
-            search_response = await client.get(pubmed_search_url)
-            search_json = search_response.json()
-            id_list = search_json["esearchresult"].get("idlist", [])
+                if not id_list:
+                    await asyncio.sleep(interval)
+                    continue
 
-            if not id_list:
-                return
+                # Fetch article details (titles)
+                fetch_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id={','.join(id_list)}&retmode=json"
+                fetch_response = await client.get(fetch_url)
+                fetch_json = fetch_response.json()
 
-            summary_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id={','.join(id_list)}&retmode=json"
-            summary_response = await client.get(summary_url)
-            summary_json = summary_response.json()
+                # Extract article titles
+                articles = []
+                for article_id in id_list:
+                    article_info = fetch_json.get("result", {}).get(article_id, {})
+                    title = article_info.get("title", "No Title Available")
+                    articles.append(f"- **{title}** (PubMed ID: {article_id})")
 
-            message = ""
-            for article_id in id_list:
-                article = summary_json["result"].get(article_id, {})
-                title = article.get("title", "No title available")
-                authors = ", ".join([author["name"] for author in article.get("authors", [])]) if "authors" in article else "Unknown authors"
-                message += f"- {title} by {authors}\n"
+                # Format message
+                message = "**Latest PubMed Articles:**\n" + "\n".join(articles)
 
-            notification_payload = {
-                "message": message.strip(),
-                "username": "telex-science Bot",
-                "event_name": "New Articles",
-                "status": "success"
-            }
-            if SLACK_WEBHOOK_URL:
-                response = await client.post(
-                SLACK_WEBHOOK_URL, json=notification_payload
-            )
-                print(f"Slack Response Code: {response.status_code}")
-                print(f"Slack Response Body: {response.text}")
-            else:
-                print("Slack Webhook URL is missing! Please set it in your .env file.")
-        except Exception as e:
-            print(f"Error: {e}")
+                # Send notification
+                notification_payload = {
+                    "message": message,
+                    "username": "PubMed Telex Bot",
+                    "event_name": "New Articles",
+                    "status": "success"
+                }
+                await client.post(payload.return_url, json=notification_payload)
+
+            except Exception as e:
+                print(f"Error: {e}")
+
+        await asyncio.sleep(interval)
 
 @app.post("/tick", status_code=202)
 def monitor(payload: MonitorPayload, background_tasks: BackgroundTasks):
