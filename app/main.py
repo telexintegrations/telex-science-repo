@@ -19,7 +19,7 @@ class Setting(BaseModel):
 class MonitorPayload(BaseModel):
     channel_id: str
     return_url: str
-    settings: List[Setting] 
+    settings: Optional[str] = None
 
 load_dotenv()
 
@@ -72,10 +72,10 @@ def get_integration_json(request: Request):
 
 async def fetch_and_send_articles(payload: MonitorPayload):
     
-    keywords = ""
+    keywords = "biochemistry"
     for setting in payload.settings:
         if setting.label.lower() == "keywords" and setting.default:
-            keywords = setting.default
+            keywords = setting.default.replace(", ", "+")
 
     pubmed_search_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={keywords}&retmax=10&sort=pub+date&retmode=json"
 
