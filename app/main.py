@@ -19,7 +19,7 @@ class Setting(BaseModel):
 class MonitorPayload(BaseModel):
     channel_id: str
     return_url: str
-    settings: Optional[str] = None
+    settings: List[Setting]
 
 load_dotenv()
 
