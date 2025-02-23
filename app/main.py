@@ -55,6 +55,7 @@ def get_integration_json(request: Request):
                     "default": "biochemistry, genetics, biotechnology, medicine"
                 }
             ],
+            "target_url": "https://hooks.slack.com/services/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",
             "tick_url": f"{base_url}/tick" 
         }
     }
@@ -77,13 +78,13 @@ async def fetch_and_send_articles(payload: MonitorPayload):
             if not id_list:
                 return
 
-            fetch_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id={','.join(id_list)}&retmode=json"
-            fetch_response = await client.get(fetch_url)
-            fetch_json = fetch_response.json()
+            summary_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id={','.join(id_list)}&retmode=json"
+            summary_response = await client.get(summary_url)
+            summary_json = summary_response.json()
 
             message = ""
             for article_id in id_list:
-                article = fetch_json["result"].get(article_id, {})
+                article = summary_json["result"].get(article_id, {})
                 title = article.get("title", "No title available")
                 authors = ", ".join([author["name"] for author in article.get("authors", [])]) if "authors" in article else "Unknown authors"
                 message += f"- {title} by {authors}\n"
