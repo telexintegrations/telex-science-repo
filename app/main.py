@@ -41,6 +41,7 @@ def get_integration_json(request: Request):
                 "background_color": "#FFFFFF"
             },
             "integration_type": "interval",
+            "author"
             "settings": [
                 {
                     "label": "Interval", 
@@ -103,5 +104,5 @@ async def fetch_and_send_articles(payload: MonitorPayload):
 
 @app.post("/tick", status_code=202)
 def monitor(payload: MonitorPayload, background_tasks: BackgroundTasks):
-    background_tasks.add_task(fetch_and_send_articles, payload)
+    BackgroundTasks.add_task(fetch_and_send_articles, payload)
     return {"status": "success"}
