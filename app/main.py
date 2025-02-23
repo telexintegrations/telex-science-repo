@@ -105,7 +105,3 @@ def monitor(payload: MonitorPayload, background_tasks: BackgroundTasks):
     # Triggers the PubMed fetch task in the background.
     background_tasks.add_task(fetch_and_send_articles, payload)
     return {"status": "success"}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
