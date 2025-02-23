@@ -6,6 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import httpx
+import os 
+from dotenv import load_dotenv
+
 
 class Setting(BaseModel):
     label: str
@@ -16,7 +19,13 @@ class Setting(BaseModel):
 class MonitorPayload(BaseModel):
     channel_id: str
     return_url: str
-    settings: List[Setting]
+    settings: List[Setting] 
+
+load_dotenv()
+
+SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
+
+print(f"SLACK_WEBHOOK_URL: {SLACK_WEBHOOK_URL}")
 
 app = FastAPI()
 
@@ -56,7 +65,7 @@ def get_integration_json(request: Request):
                     "default": "biochemistry, genetics, biotechnology, medicine"
                 }
             ],
-            "target_url": "https://hooks.slack.com/services/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",
+            "target_url": SLACK_WEBHOOK_URL,
             "tick_url": f"{base_url}/tick" 
         }
     }
@@ -96,13 +105,18 @@ async def fetch_and_send_articles(payload: MonitorPayload):
                 "event_name": "New Articles",
                 "status": "success"
             }
-            await client.post(
-                payload.return_url, json=notification_payload
+            if SLACK_WEBHOOK_URL:
+                response = await client.post(
+                SLACK_WEBHOOK_URL, json=notification_payload
             )
+                print(f"Slack Response Code: {response.status_code}")
+                print(f"Slack Response Body: {response.text}")
+            else:
+                print("Slack Webhook URL is missing! Please set it in your .env file.")
         except Exception as e:
             print(f"Error: {e}")
 
 @app.post("/tick", status_code=202)
 def monitor(payload: MonitorPayload, background_tasks: BackgroundTasks):
-    BackgroundTasks.add_task(fetch_and_send_articles, payload)
+    background_tasks.add_task(fetch_and_send_articles, payload)
     return {"status": "success"}
