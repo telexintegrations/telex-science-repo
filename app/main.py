@@ -60,13 +60,13 @@ def get_integration_json(request: Request):
     }
 
 async def fetch_and_send_articles(payload: MonitorPayload):
-    # Fetch latest PubMed articles and send notifications to Telex
+    
     keywords = ""
     for setting in payload.settings:
         if setting.label.lower() == "keywords" and setting.default:
             keywords = setting.default
 
-    pubmed_search_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={keywords}&retmax=5&sort=pub+date&retmode=json"
+    pubmed_search_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={keywords}&retmax=10&sort=pub+date&retmode=json"
 
     async with httpx.AsyncClient() as client:
         try:
@@ -90,7 +90,7 @@ async def fetch_and_send_articles(payload: MonitorPayload):
 
             notification_payload = {
                 "message": message.strip(),
-                "username": "PubMed Telex Bot",
+                "username": "telex-science Bot",
                 "event_name": "New Articles",
                 "status": "success"
             }
@@ -102,6 +102,5 @@ async def fetch_and_send_articles(payload: MonitorPayload):
 
 @app.post("/tick", status_code=202)
 def monitor(payload: MonitorPayload, background_tasks: BackgroundTasks):
-    # Triggers the PubMed fetch task in the background.
     background_tasks.add_task(fetch_and_send_articles, payload)
     return {"status": "success"}
