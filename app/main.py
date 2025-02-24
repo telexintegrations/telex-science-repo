@@ -25,8 +25,6 @@ load_dotenv()
 
 SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
 
-print(f"SLACK_WEBHOOK_URL: {SLACK_WEBHOOK_URL}")
-
 app = FastAPI()
 
 app.add_middleware(
@@ -37,7 +35,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/integration/json")
+@app.get("/integration.json")
 def get_integration_json(request: Request):
     base_url = str(request.base_url).rstrip("/")
     return {
