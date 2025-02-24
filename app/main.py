@@ -39,33 +39,51 @@ app.add_middleware(
 def get_integration_json(request: Request):
     base_url = str(request.base_url).rstrip("/")
     return {
-        "data": {
-            "descriptions": {
-                "app_name": "telex-science", 
-                "app_description": "Fetches latest PubMed articles and sends notifications via Telex.",
-                "app_logo": "https://www.shutterstock.com/image-photo/blue-helix-human-dna-structure-260nw-1669326868.jpg",
-                "app_url": base_url,
-                "background_color": "#FFFFFF"
-            },
-            "integration_type": "interval",
-            "author"
-            "settings": [
-                {
-                    "label": "Interval", 
-                    "type": "text", 
-                    "required": True, 
-                    "default": "* * * * *"
-                },
-                {
-                    "label": "Keywords", 
-                    "type": "text", 
-                    "required": False, 
-                    "default": "biochemistry, genetics, biotechnology, medicine"
-                }
-            ],
-            "target_url": SLACK_WEBHOOK_URL,
-            "tick_url": f"{base_url}/tick" 
-        }
+        {
+  "data": {
+    "date": {
+      "created_at": "2025-02-24",
+      "updated_at": "2025-02-24"
+    },
+    "descriptions": {
+      "app_name": "telex-science",
+      "app_description": "Fetches latest PubMed articles and sends notifications via Telex.",
+      "app_logo": "https://www.shutterstock.com/image-photo/blue-helix-human-dna-structure-260nw-1669326868.jpg",
+      "app_url": "https://telex-science-repo.onrender.com",
+      "background_color": "#fff"
+    },
+    "is_active": true,
+    "integration_type": "interval",
+    "integration_category": "Monitoring & Logging",
+    "key_features": [
+      "Monitoring",
+      "Real time notification"
+    ],
+    "author": "abu yusuf ",
+    "settings": [
+      {
+        "label": "Interval",
+        "type": "text",
+        "required": true,
+        "default": "60"
+      },
+      {
+        "label": "keywords",
+        "type": "text",
+        "required": true,
+        "default": "biochemistry"
+      },
+      {
+        "label": "include logs",
+        "type": "checkbox",
+        "required": true,
+        "default": "true"
+      }
+    ],
+    "target_url": "https://hooks.slack.com/services/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",
+    "tick_url": "https://telex-science-repo.onrender.com/integration.json"
+  }
+}
     }
 
 async def fetch_and_send_articles(payload: MonitorPayload, interval: int):
