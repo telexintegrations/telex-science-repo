@@ -6,9 +6,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import httpx
-import os 
+import os
 from dotenv import load_dotenv
 
+load_dotenv()
 
 class Setting(BaseModel):
     label: str
@@ -21,17 +22,13 @@ class MonitorPayload(BaseModel):
     return_url: str
     settings: List[Setting]
 
-load_dotenv()
-
-SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
-
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://staging.telex.im", "https://telex.im"],
     allow_credentials=True,
-    allow_methods=["*"],  
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -39,102 +36,107 @@ app.add_middleware(
 def get_integration_json(request: Request):
     base_url = str(request.base_url).rstrip("/")
     return {
-        {
-  "data": {
-    "date": {
-      "created_at": "2025-02-24",
-      "updated_at": "2025-02-24"
-    },
-    "descriptions": {
-      "app_name": "telex-science",
-      "app_description": "Fetches latest PubMed articles and sends notifications via Telex.",
-      "app_logo": "https://www.shutterstock.com/image-photo/blue-helix-human-dna-structure-260nw-1669326868.jpg",
-      "app_url": "https://telex-science-repo.onrender.com",
-      "background_color": "#fff"
-    },
-    "is_active": true,
-    "integration_type": "interval",
-    "integration_category": "Monitoring & Logging",
-    "key_features": [
-      "Monitoring",
-      "Real time notification"
-    ],
-    "author": "abu yusuf ",
-    "settings": [
-      {
-        "label": "Interval",
-        "type": "text",
-        "required": true,
-        "default": "60"
-      },
-      {
-        "label": "keywords",
-        "type": "text",
-        "required": true,
-        "default": "biochemistry"
-      },
-      {
-        "label": "include logs",
-        "type": "checkbox",
-        "required": true,
-        "default": "true"
-      }
-    ],
-    "target_url": "https://hooks.slack.com/services/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",
-    "tick_url": "https://telex-science-repo.onrender.com/integration.json"
-  }
-}
+        "data": {
+            "date": {
+                "created_at": "2025-02-24",
+                "updated_at": "2025-02-24"
+            },
+            "descriptions": {
+                "app_name": "telex-science",
+                "app_description": "Fetches latest PubMed articles and sends notifications via Telex.",
+                "app_logo": "https://www.shutterstock.com/image-photo/blue-helix-human-dna-structure-260nw-1669326868.jpg",
+                "app_url": "https://telex-science-repo.onrender.com",
+                "background_color": "#fff"
+            },
+            "is_active": True,
+            "integration_type": "interval",
+            "integration_category": "Monitoring & Logging",
+            "key_features": [
+                "Monitoring",
+                "Real time notification"
+            ],
+            "author": "abu yusuf",
+            "settings": [
+                {
+                    "label": "Interval",
+                    "type": "text",
+                    "required": True,
+                    "default": "60"
+                },
+                {
+                    "label": "keywords",
+                    "type": "text",
+                    "required": True,
+                    "default": "biochemistry, genetics, cancer"
+                },
+                {
+                    "label": "include logs",
+                    "type": "checkbox",
+                    "required": True,
+                    "default": "true"
+                }
+            ],
+            "target_url": "TELEX_WEBHOOK_URL", 
+            "tick_url": f"{base_url}/tick"
+        }
     }
 
 async def fetch_and_send_articles(payload: MonitorPayload, interval: int):
-    """Fetch latest PubMed articles and send notifications to Telex repeatedly."""
     while True:
-        keywords = "biochemistry"  # Default keyword
+        keywords = "biochemistry, genetics, cancer"
         for setting in payload.settings:
             if setting.label.lower() == "keywords" and setting.default:
                 keywords = setting.default.replace(", ", "+").replace(",", "+")
 
-        pubmed_search_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={keywords}&retmax=5&sort=pub+date&retmode=json"
-        async with httpx.AsyncClient() as client:
-            try:
-                search_response = await client.get(pubmed_search_url)
-                search_json = search_response.json()
-                id_list = search_json["esearchresult"].get("idlist", [])
+        keyword_list = keywords.split("+")
 
-                if not id_list:
-                    await asyncio.sleep(interval)
-                    continue
+        for keyword in keyword_list:
+            pubmed_search_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={keyword}&retmax=5&sort=pub+date&retmode=json"
+            async with httpx.AsyncClient() as client:
+                try:
+                    search_response = await client.get(pubmed_search_url)
+                    search_json = search_response.json()
+                    id_list = search_json["esearchresult"].get("idlist", [])
 
-                # Fetch article details (titles)
-                fetch_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id={','.join(id_list)}&retmode=json"
-                fetch_response = await client.get(fetch_url)
-                fetch_json = fetch_response.json()
+                    if not id_list:
+                      await asyncio.sleep(interval)
+                      continue
 
-                # Extract article titles
-                articles = []
-                for article_id in id_list:
-                    article_info = fetch_json.get("result", {}).get(article_id, {})
-                    title = article_info.get("title", "No Title Available")
-                    articles.append(f"- **{title}** (PubMed ID: {article_id})")
+                    fetch_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id={','.join(id_list)}&retmode=json"
+                    fetch_response = await client.get(fetch_url)
+                    fetch_json = fetch_response.json()
 
-                # Format message
-                message = "**Latest PubMed Articles:**\n" + "\n".join(articles)
+                    articles = []
+                    for article_id in id_list:
+                        article_info = fetch_json.get("result", {}).get(article_id, {})
+                        title = article_info.get("title", "No Title Available")
+                        articles.append(f"- **{title}** (PubMed ID: {article_id})")
 
-                # Send notification
-                notification_payload = {
-                    "message": message,
-                    "username": "PubMed Telex Bot",
-                    "event_name": "New Articles",
-                    "status": "success"
-                }
-                await client.post(payload.return_url, json=notification_payload)
+                    message = f"Latest PubMed Articles for '{keyword}':\n" + "\n".join(articles)
 
-            except Exception as e:
-                print(f"Error: {e}")
+                    notification_payload = {
+                        "message": message,
+                        "username": "PubMed Telex Bot",
+                        "event_name": "New Articles",
+                        "status": "success"
+                    }
+                    await client.post(payload.return_url, json=notification_payload)
+
+                except Exception as e:
+                    print(f"Error: {e}")
 
         await asyncio.sleep(interval)
 
 @app.post("/tick", status_code=202)
 def monitor(payload: MonitorPayload, background_tasks: BackgroundTasks):
-    background_tasks.add_task(fetch_and_send_articles, payload)
+    interval = 60  # Default interval
+    for setting in payload.settings:
+        if setting.label.lower() == "interval" and setting.default:
+            interval = int(setting.default)
+
+    background_tasks.add_task(fetch_and_send_articles, payload, interval)
     return {"status": "success"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
