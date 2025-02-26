@@ -9,7 +9,9 @@ import httpx
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv("../.env")
+
+TELEX_WEBHOOK_URL = os.getenv("TELEX_WEBHOOK_URL")
 
 class Setting(BaseModel):
     label: str
@@ -76,7 +78,7 @@ def get_integration_json(request: Request):
                     "default": "true"
                 }
             ],
-            "target_url": "TELEX_WEBHOOK_URL", 
+            "target_url": TELEX_WEBHOOK_URL, 
             "tick_url": f"{base_url}/tick"
         }
     }
@@ -123,13 +125,13 @@ async def fetch_and_send_articles(payload: MonitorPayload, interval: int):
                     await client.post(payload.return_url, json=notification_payload)
 
                 except Exception as e:
-                    print(f"Error: {e}")
+                    print(f"Error fetching articles for '{keyword}': {e}")
 
         await asyncio.sleep(interval)
 
 @app.post("/tick", status_code=202)
 def monitor(payload: MonitorPayload, background_tasks: BackgroundTasks):
-    interval = 60  # Default interval
+    interval = 60 
     for setting in payload.settings:
         if setting.label.lower() == "interval" and setting.default:
             interval = int(setting.default)
